@@ -26,7 +26,7 @@ export default function Grammar() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: exerciseType,
+          exercise_type: exerciseType,
           topic: targetTopic || undefined,
           count: 5,
         }),
@@ -116,19 +116,32 @@ export default function Grammar() {
           {weakPoints.length > 0 && (
             <div className="p-4 bg-red-50 border border-red-100 rounded-lg">
               <h3 className="font-semibold text-red-800 mb-2">Weak Points Detected</h3>
-              <div className="flex flex-wrap gap-2">
-                {weakPoints.map(wp => (
-                  <button
-                    key={wp}
-                    onClick={() => generateExercise(wp)}
-                    className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm hover:bg-red-200"
-                  >
-                    {wp}
-                  </button>
+              <div className="space-y-2">
+                {weakPoints.map((wp, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <button
+                      onClick={() => generateExercise(wp.area)}
+                      className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 flex-shrink-0"
+                    >
+                      Practice: {wp.area}
+                    </button>
+                    <div className="text-sm text-red-700">
+                      <span className="font-medium">Severity: {wp.severity}</span>
+                      {wp.tip && <p className="mt-1 text-red-600">{wp.tip}</p>}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loading && !exercise && (
+        <div className="text-center py-12">
+          <div className="inline-block w-8 h-8 border-4 border-green-200 border-t-green-600 rounded-full animate-spin"></div>
+          <p className="mt-3 text-gray-500 text-sm">AI is generating exercises...</p>
         </div>
       )}
 
