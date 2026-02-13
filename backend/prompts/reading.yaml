@@ -1,0 +1,72 @@
+part1:
+  name: "Short text multiple choice"
+  description: "Notice/message/note, understand the main message"
+  prompt: |
+    Based on this source text, create a PET Reading Part 1 question.
+    Part 1: A short text (notice, message, email) with 3 options about its meaning.
+
+    Source: {source_text}
+
+    Respond in JSON:
+    {{"text": "SHORT NOTICE TEXT", "question": "What does this notice say?", "options": ["A) ...", "B) ...", "C) ..."], "answer": "A", "explanation": "..."}}
+
+part2:
+  name: "Matching"
+  description: "5 descriptions matched to 8 short texts"
+  prompt: |
+    Based on these source texts, create a PET Reading Part 2 matching exercise.
+    Part 2: 5 people with preferences/needs, matched to 8 short descriptions.
+
+    Source: {source_text}
+
+    Respond in JSON:
+    {{"people": [{{"name": "Alex", "description": "Alex wants to..."}}], "texts": [{{"label": "A", "text": "..."}}], "answers": {{"Alex": "C"}}, "explanations": {{}}}}
+
+part3:
+  name: "Long text multiple choice"
+  description: "Longer text with detailed comprehension questions"
+  prompt: |
+    Based on this source text, create a PET Reading Part 3 exercise.
+    Part 3: A longer text with 5 four-choice comprehension questions.
+
+    Source: {source_text}
+    Rewrite to B1 level if needed.
+
+    Respond in JSON:
+    {{"passage": "...", "questions": [{{"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "answer": "B", "explanation": "..."}}]}}
+
+part4:
+  name: "Gapped text"
+  description: "Choose sentences to fill gaps in a text"
+  prompt: |
+    Create a PET Reading Part 4 exercise.
+    Part 4: A text with 5 gaps, choose from 8 sentences to fill them.
+
+    Source: {source_text}
+
+    Respond in JSON:
+    {{"passage_with_gaps": "... (1) ... (2) ...", "sentences": {{"A": "...", "B": "..."}}, "answers": {{"1": "D", "2": "A"}}, "explanations": {{}}}}
+
+part5:
+  name: "Cloze multiple choice"
+  description: "Multiple choice cloze (vocabulary and grammar)"
+  prompt: |
+    Create a PET Reading Part 5 exercise.
+    Part 5: A text with 6 gaps, each with 4 options (testing vocab/grammar).
+
+    Source: {source_text}
+
+    Respond in JSON:
+    {{"passage": "She (1)_____ to the shop...", "questions": [{{"number": 1, "options": ["A) went", "B) go", "C) going", "D) goes"], "answer": "A", "explanation": "..."}}]}}
+
+part6:
+  name: "Open cloze"
+  description: "Fill in one word per gap (grammar words)"
+  prompt: |
+    Create a PET Reading Part 6 exercise.
+    Part 6: A text with 6 gaps, student fills in ONE word per gap (usually grammar words).
+
+    Source: {source_text}
+
+    Respond in JSON:
+    {{"passage": "She went (1)_____ the cinema...", "answers": {{"1": "to", "2": "the"}}, "explanations": {{"1": "'go to' is a fixed phrase"}}}}
