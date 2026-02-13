@@ -10,6 +10,7 @@ export default function Listening() {
   const [showTranscript, setShowTranscript] = useState(false)
   const [questions, setQuestions] = useState(null)
   const [qLoading, setQLoading] = useState(false)
+  const [selectedWord, setSelectedWord] = useState(null)
 
   const fetchEpisodes = async (source) => {
     setLoading(true)
@@ -29,19 +30,34 @@ export default function Listening() {
   useEffect(() => { fetchEpisodes(tab) }, [tab])
 
   const selectEpisode = async (ep) => {
-    setSelectedEp(ep)
     setShowTranscript(false)
     setQuestions(null)
+    setLoading(true)
+
+    try {
+      // Fetch full episode data with transcript from individual endpoint
+      const url = tab === 'bbc'
+        ? `/api/listening/bbc/episode/${ep.id}`
+        : `/api/listening/kidnuz/episode/${ep.id}`
+      const res = await fetch(url)
+      const data = await res.json()
+      setSelectedEp(data)
+    } catch (e) {
+      console.error('Failed to fetch episode:', e)
+      setSelectedEp(ep) // Fallback to list data
+    }
+    setLoading(false)
   }
 
   const generateQuestions = async () => {
-    if (!selectedEp?.description) return
+    const transcript = selectedEp?.transcript || selectedEp?.description
+    if (!transcript) return
     setQLoading(true)
     try {
       const res = await fetch('/api/listening/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: selectedEp.description, count: 5 }),
+        body: JSON.stringify({ transcript, count: 5 }),
       })
       const data = await res.json()
       setQuestions(data)
@@ -49,6 +65,27 @@ export default function Listening() {
       console.error('Failed to generate questions:', e)
     }
     setQLoading(false)
+  }
+
+  const handleWordClick = (word) => {
+    const clean = word.replace(/[^a-zA-Z'-]/g, '')
+    if (clean.length > 1) setSelectedWord(clean.toLowerCase())
+  }
+
+  const addToWordBank = () => {
+    const bank = JSON.parse(localStorage.getItem('word_bank') || '[]')
+    if (!bank.find(w => w.word === selectedWord)) {
+      bank.push({
+        word: selectedWord,
+        source: 'listening',
+        addedAt: new Date().toISOString()
+      })
+      localStorage.setItem('word_bank', JSON.stringify(bank))
+      alert(`Added "${selectedWord}" to word bank!`)
+    } else {
+      alert(`"${selectedWord}" is already in word bank`)
+    }
+    setSelectedWord(null)
   }
 
   return (
@@ -115,8 +152,8 @@ export default function Listening() {
               <p className="text-sm text-gray-400">No audio available</p>
             )}
 
-            {/* Transcript toggle */}
-            {selectedEp.description && (
+            {/* Transcript toggle - only for BBC */}
+            {tab === 'bbc' && (selectedEp.transcript || selectedEp.description) && (
               <div className="mt-4">
                 <button
                   onClick={() => setShowTranscript(!showTranscript)}
@@ -125,10 +162,23 @@ export default function Listening() {
                   {showTranscript ? 'Hide transcript' : 'Show transcript'}
                 </button>
                 {showTranscript && (
-                  <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                    {selectedEp.description}
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm text-gray-700 leading-relaxed">
+                    {(selectedEp.transcript || selectedEp.description).split('\n').map((line, lineIdx) => (
+                      <div key={lineIdx} className="mb-2">
+                        {line.split(' ').map((word, wordIdx) => (
+                          <span
+                            key={wordIdx}
+                            onClick={() => handleWordClick(word)}
+                            className="cursor-pointer hover:bg-yellow-100 rounded px-0.5"
+                          >
+                            {word}{' '}
+                          </span>
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 )}
+                <p className="mt-1 text-xs text-gray-400">Tap any word to add to word bank</p>
               </div>
             )}
           </div>
@@ -158,6 +208,34 @@ export default function Listening() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Word lookup popup */}
+      {selectedWord && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50"
+          onClick={() => setSelectedWord(null)}
+        >
+          <div className="bg-white rounded-xl p-5 shadow-lg max-w-sm w-full mx-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="font-bold text-lg mb-2">{selectedWord}</h3>
+            <p className="text-gray-500 text-sm mb-3">Tap "Add to Word Bank" to save this word for review.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={addToWordBank}
+                className="px-3 py-1.5 bg-orange-600 text-white rounded-md text-sm font-medium hover:bg-orange-700"
+              >
+                Add to Word Bank
+              </button>
+              <button
+                onClick={() => setSelectedWord(null)}
+                className="px-3 py-1.5 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
