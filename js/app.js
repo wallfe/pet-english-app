@@ -204,12 +204,19 @@
     const area = $('contentArea');
     let html = '';
 
-    // Audio player
+    // Audio player or BBC link fallback
     if (session.audioUrl) {
       html += `
         <div class="audio-player">
           <span class="audio-label">🔊 音频</span>
           <audio controls preload="none" src="${session.audioUrl}"></audio>
+        </div>`;
+    } else if (session.type === 'listening') {
+      const bbcUrl = `https://www.bbc.co.uk/learningenglish/english/course/intermediate/unit-${currentUnit}/session-${currentSession}`;
+      html += `
+        <div class="audio-player">
+          <span class="audio-label">🔊 音频</span>
+          <a href="${bbcUrl}" target="_blank" rel="noopener" class="bbc-audio-link">在 BBC 页面收听 ↗</a>
         </div>`;
     }
 
