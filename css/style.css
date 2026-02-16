@@ -522,6 +522,26 @@ body {
 }
 .flashcard-actions .btn { flex: 1; }
 
+/* AI Flashcard content */
+.fc-word { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+.fc-speak-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+.fc-speak-btn:hover { background: var(--accent-light); border-color: var(--accent); }
+.fc-cn { font-size: 18px; font-weight: 600; color: var(--accent); margin-bottom: 10px; }
+.fc-example { font-size: 14px; color: var(--text); margin-bottom: 4px; font-style: italic; }
+.fc-example-cn { font-size: 13px; color: var(--text-secondary); }
+
 /* ---- Error list ---- */
 .error-stats {
   display: flex;

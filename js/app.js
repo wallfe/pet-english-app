@@ -21,11 +21,40 @@
     ERRORS: 'pet_errors',
     REVIEW: 'pet_review_due',
     API_KEY: 'pet_deepseek_key',
+    LLM_CACHE: 'pet_llm_cache',
   };
 
   // ---- DOM refs ----
   const $ = (s) => document.getElementById(s);
   const $$ = (s) => document.querySelectorAll(s);
+
+  // ---- LLM Cache (7-day expiry) ----
+  function getCachedLLM(key, type) {
+    try {
+      const cache = JSON.parse(localStorage.getItem(STORAGE.LLM_CACHE) || '{}');
+      const entry = cache[`${key}::${type}`];
+      if (entry && Date.now() - entry.ts < 7 * 24 * 3600 * 1000) return entry.data;
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+
+  function setCachedLLM(key, type, data) {
+    try {
+      const cache = JSON.parse(localStorage.getItem(STORAGE.LLM_CACHE) || '{}');
+      cache[`${key}::${type}`] = { data, ts: Date.now() };
+      localStorage.setItem(STORAGE.LLM_CACHE, JSON.stringify(cache));
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---- Pronunciation (Web Speech API) ----
+  function speakText(text) {
+    if (!window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'en-US';
+    utt.rate = 0.9;
+    speechSynthesis.speak(utt);
+  }
 
   // ---- Init ----
   async function init() {
@@ -63,27 +92,39 @@
     if (systemMsg) messages.push({ role: 'system', content: systemMsg });
     messages.push({ role: 'user', content: userMsg });
 
-    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages,
-        temperature: 0.7,
-        max_tokens: 2048,
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error?.message || `API 错误 (${resp.status})`);
+    try {
+      const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${key}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages,
+          temperature: 0.7,
+          max_tokens: 2048,
+        }),
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error?.message || `API 错误 (${resp.status})`);
+      }
+
+      const data = await resp.json();
+      return data.choices?.[0]?.message?.content || '无返回内容';
+    } catch (e) {
+      clearTimeout(timeoutId);
+      if (e.name === 'AbortError') throw new Error('API 请求超时 (60秒)，请重试');
+      throw e;
     }
-
-    const data = await resp.json();
-    return data.choices?.[0]?.message?.content || '无返回内容';
   }
 
   // ---- HTML to plain text ----
@@ -343,6 +384,17 @@ D. "That's a real bargain, I'll buy two!"
     },
   };
 
+  function parseJsonResponse(result) {
+    try {
+      const cleaned = result.replace(/```json?\s*/g, '').replace(/```\s*/g, '').trim();
+      return JSON.parse(cleaned);
+    } catch {
+      const match = result.match(/[\[{][\s\S]*[\]}]/);
+      if (match) return JSON.parse(match[0]);
+      throw new Error('无法解析AI返回数据');
+    }
+  }
+
   async function generateExercises() {
     const session = getSession();
     if (!session) return;
@@ -358,10 +410,20 @@ D. "That's a real bargain, I'll buy two!"
     exerciseState = { answered: 0, correct: 0 };
 
     try {
+      const cacheKey = `u${currentUnit}_s${currentSession}`;
+
+      // Check cache first
+      const cached = getCachedLLM(cacheKey, 'exercises');
+      if (cached) {
+        renderExercises(cached, 'exerciseList', 'exerciseScore', exerciseState);
+        btn.disabled = false;
+        btn.textContent = '🎯 PET练习题';
+        return;
+      }
+
       const type = session.type || 'vocabulary';
       const promptConfig = EXERCISE_PROMPTS[type] || EXERCISE_PROMPTS.vocabulary;
 
-      // Extract text for prompt
       const contentText = htmlToText(session.content || '').slice(0, 1500);
       const transcriptText = htmlToText(session.transcript || '').slice(0, 1500);
       const keywordsText = (session.keyWords || []).slice(0, 20).join(', ');
@@ -372,21 +434,8 @@ D. "That's a real bargain, I'll buy two!"
         promptConfig.user(session.title, vocabText)
       );
 
-      // Parse JSON from response (handle markdown code blocks)
-      let exercises;
-      try {
-        const cleaned = result.replace(/```json?\s*/g, '').replace(/```\s*/g, '').trim();
-        exercises = JSON.parse(cleaned);
-      } catch {
-        // Try to extract JSON array from text
-        const match = result.match(/\[[\s\S]*\]/);
-        if (match) {
-          exercises = JSON.parse(match[0]);
-        } else {
-          throw new Error('无法解析练习题数据');
-        }
-      }
-
+      const exercises = parseJsonResponse(result);
+      setCachedLLM(cacheKey, 'exercises', exercises);
       renderExercises(exercises, 'exerciseList', 'exerciseScore', exerciseState);
     } catch (e) {
       $('exerciseList').innerHTML = `<p style="color:var(--danger)">${esc(e.message)}</p>`;
@@ -471,6 +520,13 @@ D. "That's a real bargain, I'll buy two!"
     $('wordNetExample').classList.add('hidden');
 
     try {
+      // Check cache
+      const cached = getCachedLLM(word.toLowerCase(), 'wordnet');
+      if (cached) {
+        renderWordNetworkSVG(cached);
+        return;
+      }
+
       const systemMsg = `你是英语词汇专家。为给定的英语单词生成词汇联想网络。返回纯JSON，不要markdown代码块。格式：
 {
   "center": "查询的单词",
@@ -485,17 +541,8 @@ D. "That's a real bargain, I'll buy two!"
 每个分类最多给4个词/短语。适合B1水平的小学生理解。`;
 
       const result = await callLLM(systemMsg, `请为单词 "${word}" 生成词汇联想网络。`);
-
-      let data;
-      try {
-        const cleaned = result.replace(/```json?\s*/g, '').replace(/```\s*/g, '').trim();
-        data = JSON.parse(cleaned);
-      } catch {
-        const match = result.match(/\{[\s\S]*\}/);
-        if (match) data = JSON.parse(match[0]);
-        else throw new Error('无法解析词汇网络数据');
-      }
-
+      const data = parseJsonResponse(result);
+      setCachedLLM(word.toLowerCase(), 'wordnet', data);
       renderWordNetworkSVG(data);
     } catch (e) {
       $('wordNetSvg').innerHTML = `<p style="color:var(--danger);padding:20px">${esc(e.message)}</p>`;
@@ -625,6 +672,16 @@ D. "That's a real bargain, I'll buy two!"
     $('lectureContent').innerHTML = '<div class="loading-dots">AI 正在生成讲解</div>';
 
     try {
+      const cacheKey = `u${currentUnit}_s${currentSession}`;
+
+      const cached = getCachedLLM(cacheKey, 'lecture');
+      if (cached) {
+        $('lectureContent').innerHTML = formatMarkdown(cached);
+        btn.disabled = false;
+        btn.textContent = '📚 AI讲解';
+        return;
+      }
+
       const contentText = htmlToText(session.content || '').slice(0, 2000);
       const transcriptText = htmlToText(session.transcript || '').slice(0, 1000);
       const text = contentText || transcriptText;
@@ -633,6 +690,7 @@ D. "That's a real bargain, I'll buy two!"
       const userMsg = `请为以下课程内容做一个10分钟的讲解：\n\n主题：${session.title}\n类型：${session.typeLabel}\n\n内容摘要：\n${text}`;
 
       const result = await callLLM(systemMsg, userMsg);
+      setCachedLLM(cacheKey, 'lecture', result);
       $('lectureContent').innerHTML = formatMarkdown(result);
     } catch (e) {
       $('lectureContent').innerHTML = `<p style="color:var(--danger)">${esc(e.message)}</p>`;
@@ -648,11 +706,24 @@ D. "That's a real bargain, I'll buy two!"
   async function explainWord(word) {
     const popup = $('wordPopup');
     const body = $('wordPopupBody');
-    $('wordPopupTitle').textContent = word;
+    $('wordPopupTitle').innerHTML = `${esc(word)} <button class="fc-speak-btn" id="popupSpeakBtn" style="margin-left:8px;vertical-align:middle">🔊</button>`;
     body.innerHTML = '<div class="loading-dots">AI 解释中</div>';
     popup.classList.remove('hidden');
 
+    // Bind speak button
+    setTimeout(() => {
+      const btn = $('popupSpeakBtn');
+      if (btn) btn.addEventListener('click', () => speakText(word));
+    }, 0);
+
     try {
+      // Check cache
+      const cached = getCachedLLM(word.toLowerCase(), 'explain');
+      if (cached) {
+        body.innerHTML = formatMarkdown(cached);
+        return;
+      }
+
       const unit = units[currentUnit];
       const systemMsg = '你是英语词汇教学专家，正在给中国初中生解释单词。请用中英混合的方式解释，简洁明了。';
       const userMsg = `请解释单词/短语 "${word}"（来自BBC Learning English课程 "${unit.title}"）：
@@ -662,10 +733,80 @@ D. "That's a real bargain, I'll buy two!"
 控制在150词以内。`;
 
       const result = await callLLM(systemMsg, userMsg);
+      setCachedLLM(word.toLowerCase(), 'explain', result);
       body.innerHTML = formatMarkdown(result);
     } catch (e) {
       body.innerHTML = `<p style="color:var(--danger)">${esc(e.message)}</p>`;
     }
+  }
+
+  // ================================================================
+  //  AI FLASHCARDS — Generated with Chinese definitions
+  // ================================================================
+  async function generateAIFlashcards() {
+    const session = getSession();
+    if (!session) return;
+
+    const keywords = (session.keyWords || []).slice(0, 15);
+    if (keywords.length === 0) {
+      alert('当前Session没有关键词');
+      return;
+    }
+
+    const btn = $('btnFlashcards');
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+
+    try {
+      const cacheKey = `u${currentUnit}_s${currentSession}`;
+
+      // Check cache
+      const cached = getCachedLLM(cacheKey, 'flashcards');
+      if (cached) {
+        showAIFlashcards(cached, session.title);
+        btn.disabled = false;
+        btn.textContent = '🃏 AI闪卡';
+        return;
+      }
+
+      const systemMsg = `你是英语教学专家。为每个英语单词/短语生成闪卡数据，包含中文释义和中英例句。
+返回纯JSON数组，不要markdown代码块。格式：
+[{"word":"单词","cn":"中文释义","example_en":"English example sentence","example_cn":"中文翻译"}]
+释义和例句要适合B1水平的初中生理解。例句要简短实用。`;
+
+      const userMsg = `请为以下单词/短语生成闪卡：\n${keywords.join(', ')}`;
+      const result = await callLLM(systemMsg, userMsg);
+      const cards = parseJsonResponse(result);
+
+      setCachedLLM(cacheKey, 'flashcards', cards);
+      showAIFlashcards(cards, session.title);
+    } catch (e) {
+      alert('闪卡生成失败: ' + e.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = '🃏 AI闪卡';
+  }
+
+  function showAIFlashcards(cards, sessionTitle) {
+    if (!cards || cards.length === 0) return;
+
+    // Shuffle
+    for (let i = cards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cards[i], cards[j]] = [cards[j], cards[i]];
+    }
+
+    flashcards = cards.map((c) => ({
+      word: c.word,
+      cn: c.cn,
+      example_en: c.example_en,
+      example_cn: c.example_cn,
+      isAI: true,
+    }));
+    flashcardIdx = 0;
+    showFlashcard();
+    $('flashcardModal').classList.remove('hidden');
   }
 
   // ================================================================
@@ -952,8 +1093,28 @@ D. "That's a real bargain, I'll buy two!"
     }
     const card = flashcards[flashcardIdx];
     $('flashcardCount').textContent = `${flashcardIdx + 1} / ${flashcards.length}`;
-    $('flashcardFront').textContent = card.word;
-    $('flashcardBack').textContent = `Unit ${card.unitId}, Session ${card.sessionId}`;
+
+    if (card.isAI) {
+      // AI flashcard: front = word + speak btn, back = cn + example
+      $('flashcardFront').innerHTML = `
+        <div class="fc-word">${esc(card.word)}</div>
+        <button class="fc-speak-btn" onclick="event.stopPropagation();" id="fcSpeakBtn">🔊</button>
+      `;
+      $('flashcardBack').innerHTML = `
+        <div class="fc-cn">${esc(card.cn || '')}</div>
+        <div class="fc-example">${esc(card.example_en || '')}</div>
+        <div class="fc-example-cn">${esc(card.example_cn || '')}</div>
+      `;
+      // Bind speak button after render
+      setTimeout(() => {
+        const speakBtn = $('fcSpeakBtn');
+        if (speakBtn) speakBtn.addEventListener('click', () => speakText(card.word));
+      }, 0);
+    } else {
+      $('flashcardFront').textContent = card.word;
+      $('flashcardBack').textContent = `Unit ${card.unitId}, Session ${card.sessionId}`;
+    }
+
     $('flashcardBack').classList.add('hidden');
     $('flashcardFront').classList.remove('hidden');
     flashcardFlipped = false;
@@ -1022,6 +1183,7 @@ D. "That's a real bargain, I'll buy two!"
       }
     });
     $('btnLecture').addEventListener('click', generateLecture);
+    $('btnFlashcards').addEventListener('click', generateAIFlashcards);
 
     // Word network input
     $('btnWordNetGo').addEventListener('click', () => {
