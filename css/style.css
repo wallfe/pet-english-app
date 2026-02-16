@@ -425,6 +425,8 @@ body {
   min-height: 60px;
 }
 #aiFcWordnetSvg svg { width: 100%; display: block; }
+#aiFcWordnetSvg .wn-node:hover rect { opacity: 1; }
+#aiFcWordnetSvg .wn-node:hover { filter: brightness(1.15); }
 
 .wordnet-example {
   margin-top: 12px;

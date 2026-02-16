@@ -352,6 +352,12 @@ D. "That's a real bargain, I'll buy two!"
     }
   }
 
+  function showActionArea(id) {
+    ['exerciseArea', 'aiFlashcardArea', 'lectureArea'].forEach(
+      (a) => $(a).classList.toggle('hidden', a !== id)
+    );
+  }
+
   async function generateExercises() {
     const session = getSession();
     if (!session) return;
@@ -360,8 +366,7 @@ D. "That's a real bargain, I'll buy two!"
     btn.disabled = true;
     btn.textContent = '生成中...';
 
-    const area = $('exerciseArea');
-    area.classList.remove('hidden');
+    showActionArea('exerciseArea');
     $('exerciseList').innerHTML = '<div class="loading-dots">AI 正在生成PET练习题</div>';
     $('exerciseScore').textContent = '';
     exerciseState = { answered: 0, correct: 0 };
@@ -532,11 +537,13 @@ D. "That's a real bargain, I'll buy two!"
       const rx = x - rw / 2;
       const ry = y - rh / 2;
 
+      if (!isCenter) svg += `<g class="wn-node" data-word="${escSvg(word)}" data-cn="${escSvg(cn || '')}" style="cursor:pointer">`;
       svg += `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="8" fill="${color}" opacity="${isCenter ? 1 : 0.9}"/>`;
       svg += `<text x="${x}" y="${y - (cn ? 4 : 0)}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="${fontSize}" font-weight="${isCenter ? 700 : 500}">${escSvg(word)}</text>`;
       if (cn) {
         svg += `<text x="${x}" y="${y + fontSize - 2}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="${cnSize}" opacity="0.85">${escSvg(cn)}</text>`;
       }
+      if (!isCenter) svg += `</g>`;
       return { x, y, rw, rh };
     }
 
@@ -589,6 +596,13 @@ D. "That's a real bargain, I'll buy two!"
     svg += '</svg>';
     $(svgId).innerHTML = svg;
 
+    // Bind click on non-center nodes → show word card popup
+    $(svgId).querySelectorAll('.wn-node').forEach((g) => {
+      g.addEventListener('click', () => {
+        showWordCard(g.dataset.word, g.dataset.cn);
+      });
+    });
+
     // Show example
     if (data.example) {
       const exEl = $(exId);
@@ -625,8 +639,7 @@ D. "That's a real bargain, I'll buy two!"
     btn.disabled = true;
     btn.textContent = '生成中...';
 
-    const area = $('lectureArea');
-    area.classList.remove('hidden');
+    showActionArea('lectureArea');
     $('lectureContent').innerHTML = '<div class="loading-dots">AI 正在生成讲解</div>';
 
     try {
@@ -659,43 +672,56 @@ D. "That's a real bargain, I'll buy two!"
   }
 
   // ================================================================
-  //  WORD EXPLANATION (popup)
+  //  WORD CARD POPUP (from word network clicks, no re-trigger)
   // ================================================================
-  async function explainWord(word) {
+  async function showWordCard(word, cn) {
     const popup = $('wordPopup');
     const body = $('wordPopupBody');
     $('wordPopupTitle').innerHTML = `${esc(word)} <button class="fc-speak-btn" id="popupSpeakBtn" style="margin-left:8px;vertical-align:middle">🔊</button>`;
-    body.innerHTML = '<div class="loading-dots">AI 解释中</div>';
     popup.classList.remove('hidden');
 
-    // Bind speak button
+    // Show cn immediately if available
+    if (cn) {
+      body.innerHTML = `<div class="fc-cn" style="margin-bottom:8px">${esc(cn)}</div><div class="loading-dots">加载例句中</div>`;
+    } else {
+      body.innerHTML = '<div class="loading-dots">AI 生成中</div>';
+    }
+
     setTimeout(() => {
-      const btn = $('popupSpeakBtn');
-      if (btn) btn.addEventListener('click', () => speakText(word));
+      const sb = $('popupSpeakBtn');
+      if (sb) sb.addEventListener('click', () => speakText(word));
     }, 0);
 
     try {
-      // Check cache
-      const cached = getCachedLLM(word.toLowerCase(), 'explain');
+      const cached = getCachedLLM(word.toLowerCase(), 'wordcard');
       if (cached) {
-        body.innerHTML = formatMarkdown(cached);
+        renderWordCardPopup(body, cached);
         return;
       }
 
-      const unit = units[currentUnit];
-      const systemMsg = '你是英语词汇教学专家，正在给中国初中生解释单词。请用中英混合的方式解释，简洁明了。';
-      const userMsg = `请解释单词/短语 "${word}"（来自BBC Learning English课程 "${unit.title}"）：
-1. **释义**: 英文定义 + 中文意思
-2. **例句**: 2个例句
-3. **注意**: 常见错误或用法提示
-控制在150词以内。`;
-
-      const result = await callLLM(systemMsg, userMsg);
-      setCachedLLM(word.toLowerCase(), 'explain', result);
-      body.innerHTML = formatMarkdown(result);
+      const systemMsg = '你是英语教学专家。为给定单词生成闪卡。返回纯JSON，格式：{"word":"单词","cn":"中文释义","example_en":"例句","example_cn":"翻译"}。简短实用，适合PET/FCE水平。';
+      const result = await callLLM(systemMsg, `请为单词 "${word}" 生成闪卡。`);
+      const data = parseJsonResponse(result);
+      setCachedLLM(word.toLowerCase(), 'wordcard', data);
+      renderWordCardPopup(body, data);
     } catch (e) {
       body.innerHTML = `<p style="color:var(--danger)">${esc(e.message)}</p>`;
     }
+  }
+
+  function renderWordCardPopup(body, data) {
+    body.innerHTML = `
+      <div class="fc-cn" style="margin-bottom:12px;font-size:16px">${esc(data.cn || '')}</div>
+      <div class="fc-example" style="margin-bottom:4px">
+        ${esc(data.example_en || '')}
+        <button class="fc-speak-btn" id="popupExSpeakBtn" style="margin-left:6px">🔊</button>
+      </div>
+      <div class="fc-example-cn">${esc(data.example_cn || '')}</div>
+    `;
+    setTimeout(() => {
+      const sb = document.getElementById('popupExSpeakBtn');
+      if (sb) sb.addEventListener('click', () => speakText(data.example_en));
+    }, 0);
   }
 
   // ================================================================
@@ -709,8 +735,7 @@ D. "That's a real bargain, I'll buy two!"
     btn.disabled = true;
     btn.textContent = '生成中...';
 
-    const area = $('aiFlashcardArea');
-    area.classList.remove('hidden');
+    showActionArea('aiFlashcardArea');
     $('aiFcCard').innerHTML = '<div class="loading-dots">AI 正在从课程内容提取PET/FCE词汇并生成闪卡</div>';
     $('aiFcWordnetSvg').innerHTML = '';
     $('aiFcWordnetExample').classList.add('hidden');
@@ -805,10 +830,14 @@ D. "That's a real bargain, I'll buy two!"
       $('aiFcCard').innerHTML = `
         <div class="ai-fc-back">
           <div class="fc-cn">${esc(card.cn || '')}</div>
-          <div class="fc-example">${esc(card.example_en || '')}</div>
+          <div class="fc-example">${esc(card.example_en || '')} <button class="fc-speak-btn" id="inlineExSpeakBtn">🔊</button></div>
           <div class="fc-example-cn">${esc(card.example_cn || '')}</div>
         </div>
       `;
+      setTimeout(() => {
+        const sb = $('inlineExSpeakBtn');
+        if (sb) sb.addEventListener('click', (e) => { e.stopPropagation(); speakText(card.example_en); });
+      }, 0);
     } else {
       $('aiFcCard').innerHTML = `
         <div class="ai-fc-front">
