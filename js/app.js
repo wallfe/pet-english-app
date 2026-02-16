@@ -159,7 +159,7 @@
     $('contentArea').innerHTML = '<div class="empty-state"><div class="empty-icon">📚</div><p>选择一个 Session 开始学习</p></div>';
     $('actionBar').classList.add('hidden');
     $('exerciseArea').classList.add('hidden');
-    $('wordNetArea').classList.add('hidden');
+    $('aiFlashcardArea').classList.add('hidden');
     $('lectureArea').classList.add('hidden');
     updateEssayTopics();
   }
@@ -185,17 +185,10 @@
       t.classList.toggle('active', i === id - 1);
     });
     $('exerciseArea').classList.add('hidden');
-    $('wordNetArea').classList.add('hidden');
+    $('aiFlashcardArea').classList.add('hidden');
     $('lectureArea').classList.add('hidden');
     renderContent();
     $('actionBar').classList.remove('hidden');
-
-    // Pre-fill word network input with first keyword
-    const session = getSession();
-    if (session && session.keyWords && session.keyWords.length > 0) {
-      const firstReal = session.keyWords.find((kw) => kw.length > 2 && kw.length < 30 && !/^[A-Z]{3,}$/.test(kw));
-      if (firstReal) $('wordNetInput').value = firstReal;
-    }
   }
 
   function getSession() {
@@ -220,27 +213,9 @@
         </div>`;
     }
 
-    // Transcript
+    // Transcript (collapsed by default)
     if (session.transcript) {
-      html += buildSection('📝 Transcript', session.transcript, 'transcript');
-    }
-
-    // Content
-    if (session.content) {
-      html += buildSection('📖 教学内容', session.content, 'content-html');
-    }
-
-    // Keywords
-    if (session.keyWords && session.keyWords.length > 0) {
-      const tags = session.keyWords
-        .map((kw) => `<span class="keyword-tag" data-word="${esc(kw)}">${esc(kw)}</span>`)
-        .join('');
-      html += buildSection(
-        `🏷️ 关键词 (${session.keyWords.length}) <span style="font-weight:normal;font-size:12px;color:var(--text-secondary)">单击=词汇网络 | 双击=AI解释</span>`,
-        `<div class="keyword-list">${tags}</div>`,
-        null,
-        true
-      );
+      html += buildSection('📝 Transcript', session.transcript, 'transcript', true);
     }
 
     area.innerHTML = html;
@@ -250,24 +225,6 @@
       h.addEventListener('click', () => {
         h.classList.toggle('collapsed');
         h.nextElementSibling.classList.toggle('collapsed');
-      });
-    });
-
-    // Bind keyword: single click = word network, double click = AI explain
-    area.querySelectorAll('.keyword-tag').forEach((tag) => {
-      let clickTimer = null;
-      tag.addEventListener('click', () => {
-        if (clickTimer) return;
-        clickTimer = setTimeout(() => {
-          clickTimer = null;
-          $('wordNetInput').value = tag.dataset.word;
-          generateWordNetwork(tag.dataset.word);
-        }, 250);
-      });
-      tag.addEventListener('dblclick', () => {
-        clearTimeout(clickTimer);
-        clickTimer = null;
-        explainWord(tag.dataset.word);
       });
     });
   }
@@ -510,20 +467,19 @@ D. "That's a real bargain, I'll buy two!"
   // ================================================================
   //  WORD NETWORK — SVG visualization
   // ================================================================
-  async function generateWordNetwork(word) {
+  async function generateWordNetwork(word, svgId, exId) {
     if (!word || !word.trim()) return;
     word = word.trim();
+    svgId = svgId || 'aiFcWordnetSvg';
+    exId = exId || 'aiFcWordnetExample';
 
-    const area = $('wordNetArea');
-    area.classList.remove('hidden');
-    $('wordNetSvg').innerHTML = '<div class="loading-dots" style="padding:40px;text-align:center">AI 正在生成词汇网络</div>';
-    $('wordNetExample').classList.add('hidden');
+    $(svgId).innerHTML = '<div class="loading-dots" style="padding:20px;text-align:center">词汇网络加载中</div>';
+    $(exId).classList.add('hidden');
 
     try {
-      // Check cache
       const cached = getCachedLLM(word.toLowerCase(), 'wordnet');
       if (cached) {
-        renderWordNetworkSVG(cached);
+        renderWordNetworkSVG(cached, svgId, exId);
         return;
       }
 
@@ -538,18 +494,20 @@ D. "That's a real bargain, I'll buy two!"
   "example": "一个包含该词的例句",
   "example_cn": "例句中文翻译"
 }
-每个分类最多给4个词/短语。适合B1水平的小学生理解。`;
+每个分类最多给4个词/短语。适合PET/FCE(B1-B2)水平理解。`;
 
       const result = await callLLM(systemMsg, `请为单词 "${word}" 生成词汇联想网络。`);
       const data = parseJsonResponse(result);
       setCachedLLM(word.toLowerCase(), 'wordnet', data);
-      renderWordNetworkSVG(data);
+      renderWordNetworkSVG(data, svgId, exId);
     } catch (e) {
-      $('wordNetSvg').innerHTML = `<p style="color:var(--danger);padding:20px">${esc(e.message)}</p>`;
+      $(svgId).innerHTML = `<p style="color:var(--danger);padding:20px">${esc(e.message)}</p>`;
     }
   }
 
-  function renderWordNetworkSVG(data) {
+  function renderWordNetworkSVG(data, svgId, exId) {
+    svgId = svgId || 'aiFcWordnetSvg';
+    exId = exId || 'aiFcWordnetExample';
     const W = 700, H = 360;
     const cx = 350, cy = 180;
     const colors = {
@@ -629,11 +587,11 @@ D. "That's a real bargain, I'll buy two!"
     });
 
     svg += '</svg>';
-    $('wordNetSvg').innerHTML = svg;
+    $(svgId).innerHTML = svg;
 
     // Show example
     if (data.example) {
-      const exEl = $('wordNetExample');
+      const exEl = $(exId);
       exEl.innerHTML = `<strong>例句:</strong> ${esc(data.example)}<br><span style="color:var(--text-secondary)">${esc(data.example_cn || '')}</span>`;
       exEl.classList.remove('hidden');
     }
@@ -747,66 +705,122 @@ D. "That's a real bargain, I'll buy two!"
     const session = getSession();
     if (!session) return;
 
-    const keywords = (session.keyWords || []).slice(0, 15);
-    if (keywords.length === 0) {
-      alert('当前Session没有关键词');
-      return;
-    }
-
     const btn = $('btnFlashcards');
     btn.disabled = true;
     btn.textContent = '生成中...';
+
+    const area = $('aiFlashcardArea');
+    area.classList.remove('hidden');
+    $('aiFcCard').innerHTML = '<div class="loading-dots">AI 正在从课程内容提取PET/FCE词汇并生成闪卡</div>';
+    $('aiFcWordnetSvg').innerHTML = '';
+    $('aiFcWordnetExample').classList.add('hidden');
 
     try {
       const cacheKey = `u${currentUnit}_s${currentSession}`;
 
       // Check cache
-      const cached = getCachedLLM(cacheKey, 'flashcards');
+      const cached = getCachedLLM(cacheKey, 'flashcards_v2');
       if (cached) {
-        showAIFlashcards(cached, session.title);
+        initInlineFlashcards(cached);
         btn.disabled = false;
         btn.textContent = '🃏 AI闪卡';
         return;
       }
 
-      const systemMsg = `你是英语教学专家。为每个英语单词/短语生成闪卡数据，包含中文释义和中英例句。
-返回纯JSON数组，不要markdown代码块。格式：
-[{"word":"单词","cn":"中文释义","example_en":"English example sentence","example_cn":"中文翻译"}]
-释义和例句要适合B1水平的初中生理解。例句要简短实用。`;
+      // Extract content for LLM
+      const contentText = htmlToText(session.content || '').slice(0, 2000);
+      const transcriptText = htmlToText(session.transcript || '').slice(0, 1500);
+      const text = contentText || transcriptText;
 
-      const userMsg = `请为以下单词/短语生成闪卡：\n${keywords.join(', ')}`;
+      const systemMsg = `你是英语教学专家，专注PET/FCE考试词汇。分析以下BBC Learning English课程内容，提取10-15个PET/FCE考试级别(B1-B2)的重要词汇或短语。
+
+要求：
+- 难度不低于PET(B1)水平，优先FCE(B2)级别
+- 排除基础词汇（数字、简单日常词如twenty-two, Monday, hello等）
+- 优先选择：多义词、高频搭配、学术词汇、常见考点
+- 每个词给出中文释义和实用例句
+
+返回纯JSON数组，不要markdown代码块。格式：
+[{"word":"词汇","cn":"中文释义","example_en":"English example","example_cn":"例句翻译"}]`;
+
+      const userMsg = `课程主题：${session.title}\n类型：${session.typeLabel}\n\n课程内容：\n${text}`;
       const result = await callLLM(systemMsg, userMsg);
       const cards = parseJsonResponse(result);
 
-      setCachedLLM(cacheKey, 'flashcards', cards);
-      showAIFlashcards(cards, session.title);
+      setCachedLLM(cacheKey, 'flashcards_v2', cards);
+      initInlineFlashcards(cards);
     } catch (e) {
-      alert('闪卡生成失败: ' + e.message);
+      $('aiFcCard').innerHTML = `<p style="color:var(--danger)">${esc(e.message)}</p>`;
     }
 
     btn.disabled = false;
     btn.textContent = '🃏 AI闪卡';
   }
 
-  function showAIFlashcards(cards, sessionTitle) {
+  function initInlineFlashcards(cards) {
     if (!cards || cards.length === 0) return;
-
-    // Shuffle
-    for (let i = cards.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [cards[i], cards[j]] = [cards[j], cards[i]];
-    }
 
     flashcards = cards.map((c) => ({
       word: c.word,
       cn: c.cn,
       example_en: c.example_en,
       example_cn: c.example_cn,
-      isAI: true,
     }));
     flashcardIdx = 0;
-    showFlashcard();
-    $('flashcardModal').classList.remove('hidden');
+    flashcardFlipped = false;
+    showInlineFlashcard();
+  }
+
+  function showInlineFlashcard() {
+    if (flashcardIdx < 0) flashcardIdx = 0;
+    if (flashcardIdx >= flashcards.length) flashcardIdx = flashcards.length - 1;
+
+    const card = flashcards[flashcardIdx];
+    $('aiFcCount').textContent = `${flashcardIdx + 1} / ${flashcards.length}`;
+    flashcardFlipped = false;
+
+    // Front: word + speak button
+    $('aiFcCard').innerHTML = `
+      <div class="ai-fc-front">
+        <div class="fc-word">${esc(card.word)}</div>
+        <button class="fc-speak-btn" id="inlineSpeakBtn">🔊</button>
+      </div>
+    `;
+
+    setTimeout(() => {
+      const btn = $('inlineSpeakBtn');
+      if (btn) btn.addEventListener('click', () => speakText(card.word));
+    }, 0);
+
+    // Auto-load word network for this word
+    generateWordNetwork(card.word, 'aiFcWordnetSvg', 'aiFcWordnetExample');
+  }
+
+  function flipInlineCard() {
+    if (!flashcards.length) return;
+    const card = flashcards[flashcardIdx];
+    flashcardFlipped = !flashcardFlipped;
+
+    if (flashcardFlipped) {
+      $('aiFcCard').innerHTML = `
+        <div class="ai-fc-back">
+          <div class="fc-cn">${esc(card.cn || '')}</div>
+          <div class="fc-example">${esc(card.example_en || '')}</div>
+          <div class="fc-example-cn">${esc(card.example_cn || '')}</div>
+        </div>
+      `;
+    } else {
+      $('aiFcCard').innerHTML = `
+        <div class="ai-fc-front">
+          <div class="fc-word">${esc(card.word)}</div>
+          <button class="fc-speak-btn" id="inlineSpeakBtn">🔊</button>
+        </div>
+      `;
+      setTimeout(() => {
+        const btn = $('inlineSpeakBtn');
+        if (btn) btn.addEventListener('click', () => speakText(card.word));
+      }, 0);
+    }
   }
 
   // ================================================================
@@ -1093,28 +1107,8 @@ D. "That's a real bargain, I'll buy two!"
     }
     const card = flashcards[flashcardIdx];
     $('flashcardCount').textContent = `${flashcardIdx + 1} / ${flashcards.length}`;
-
-    if (card.isAI) {
-      // AI flashcard: front = word + speak btn, back = cn + example
-      $('flashcardFront').innerHTML = `
-        <div class="fc-word">${esc(card.word)}</div>
-        <button class="fc-speak-btn" onclick="event.stopPropagation();" id="fcSpeakBtn">🔊</button>
-      `;
-      $('flashcardBack').innerHTML = `
-        <div class="fc-cn">${esc(card.cn || '')}</div>
-        <div class="fc-example">${esc(card.example_en || '')}</div>
-        <div class="fc-example-cn">${esc(card.example_cn || '')}</div>
-      `;
-      // Bind speak button after render
-      setTimeout(() => {
-        const speakBtn = $('fcSpeakBtn');
-        if (speakBtn) speakBtn.addEventListener('click', () => speakText(card.word));
-      }, 0);
-    } else {
-      $('flashcardFront').textContent = card.word;
-      $('flashcardBack').textContent = `Unit ${card.unitId}, Session ${card.sessionId}`;
-    }
-
+    $('flashcardFront').textContent = card.word;
+    $('flashcardBack').textContent = `Unit ${card.unitId}, Session ${card.sessionId}`;
     $('flashcardBack').classList.add('hidden');
     $('flashcardFront').classList.remove('hidden');
     flashcardFlipped = false;
@@ -1174,27 +1168,17 @@ D. "That's a real bargain, I'll buy two!"
 
     // Action buttons
     $('btnExercises').addEventListener('click', generateExercises);
-    $('btnWordNet').addEventListener('click', () => {
-      const word = $('wordNetInput').value.trim();
-      if (word) generateWordNetwork(word);
-      else {
-        $('wordNetArea').classList.remove('hidden');
-        $('wordNetInput').focus();
-      }
-    });
-    $('btnLecture').addEventListener('click', generateLecture);
     $('btnFlashcards').addEventListener('click', generateAIFlashcards);
+    $('btnLecture').addEventListener('click', generateLecture);
 
-    // Word network input
-    $('btnWordNetGo').addEventListener('click', () => {
-      const word = $('wordNetInput').value.trim();
-      if (word) generateWordNetwork(word);
+    // Inline flashcard navigation
+    $('aiFcFlip').addEventListener('click', flipInlineCard);
+    $('aiFcCard').addEventListener('click', flipInlineCard);
+    $('aiFcPrev').addEventListener('click', () => {
+      if (flashcardIdx > 0) { flashcardIdx--; showInlineFlashcard(); }
     });
-    $('wordNetInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const word = $('wordNetInput').value.trim();
-        if (word) generateWordNetwork(word);
-      }
+    $('aiFcNext').addEventListener('click', () => {
+      if (flashcardIdx < flashcards.length - 1) { flashcardIdx++; showInlineFlashcard(); }
     });
 
     // Review buttons

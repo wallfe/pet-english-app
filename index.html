@@ -68,7 +68,6 @@
         <div class="action-bar hidden" id="actionBar">
           <button class="action-btn" id="btnExercises">🎯 PET练习题</button>
           <button class="action-btn" id="btnFlashcards">🃏 AI闪卡</button>
-          <button class="action-btn" id="btnWordNet">🕸️ 词汇网络</button>
           <button class="action-btn" id="btnLecture">📚 AI讲解</button>
         </div>
 
@@ -81,17 +80,21 @@
           <div id="exerciseList"></div>
         </div>
 
-        <!-- Word Network Area -->
-        <div class="wordnet-area hidden" id="wordNetArea">
-          <div class="wordnet-header">
-            <h3>词汇联想网络</h3>
-            <div class="wordnet-input-row">
-              <input type="text" class="wordnet-input" id="wordNetInput" placeholder="输入单词..." />
-              <button class="btn" id="btnWordNetGo">查询</button>
-            </div>
+        <!-- AI Flashcard + Word Network (inline) -->
+        <div class="ai-fc-area hidden" id="aiFlashcardArea">
+          <div class="ai-fc-header">
+            <h3>AI 闪卡</h3>
+            <span class="ai-fc-count" id="aiFcCount"></span>
           </div>
-          <div id="wordNetSvg"></div>
-          <div class="wordnet-example hidden" id="wordNetExample"></div>
+          <div class="ai-fc-card" id="aiFcCard"></div>
+          <div class="ai-fc-nav">
+            <button class="btn btn-outline" id="aiFcPrev">&larr; 上一个</button>
+            <button class="btn" id="aiFcFlip">翻转</button>
+            <button class="btn btn-outline" id="aiFcNext">下一个 &rarr;</button>
+          </div>
+          <div class="ai-fc-wordnet-label">🕸️ 词汇网络</div>
+          <div id="aiFcWordnetSvg"></div>
+          <div class="wordnet-example hidden" id="aiFcWordnetExample"></div>
         </div>
 
         <!-- AI Lecture Area -->

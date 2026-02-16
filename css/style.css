@@ -368,38 +368,63 @@ body {
 }
 .exercise-explanation.show { display: block; }
 
-/* ---- Word Network Area ---- */
-.wordnet-area {
+/* ---- AI Flashcard Area (inline) ---- */
+.ai-fc-area {
   max-width: 800px;
   margin-top: 20px;
 }
-.wordnet-area.hidden { display: none; }
+.ai-fc-area.hidden { display: none; }
 
-.wordnet-header {
+.ai-fc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 16px;
 }
-.wordnet-header h3 { font-size: 16px; margin-bottom: 10px; }
-.wordnet-input-row {
+.ai-fc-header h3 { font-size: 16px; }
+.ai-fc-count { font-size: 14px; color: var(--text-secondary); font-weight: 600; }
+
+.ai-fc-card {
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.ai-fc-card:hover { background: var(--surface-hover); }
+
+.ai-fc-front, .ai-fc-back { width: 100%; }
+
+.ai-fc-nav {
   display: flex;
   gap: 8px;
+  justify-content: center;
+  margin-bottom: 24px;
 }
-.wordnet-input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 14px;
-}
-.wordnet-input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ai-fc-nav .btn { min-width: 90px; }
 
-#wordNetSvg {
+.ai-fc-wordnet-label {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+#aiFcWordnetSvg {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  min-height: 100px;
+  min-height: 60px;
 }
-#wordNetSvg svg { width: 100%; display: block; }
+#aiFcWordnetSvg svg { width: 100%; display: block; }
 
 .wordnet-example {
   margin-top: 12px;
