@@ -220,6 +220,11 @@
         </div>`;
     }
 
+    // Reading content (shown for reading-type sessions)
+    if (session.type === 'reading' && session.content) {
+      html += buildSection('📄 Article', session.content, 'reading-article', false);
+    }
+
     // Transcript (collapsed by default)
     if (session.transcript) {
       html += buildSection('📝 Transcript', session.transcript, 'transcript', true);
@@ -294,14 +299,20 @@ A. hard-working  B. hard working  C. hardly-working  D. hardly working
 
 每道题给一个完整的情境句或2-3句小语境，空格处需要填入正确的语法形式。选项是同一动词的不同时态形式。
 
-示例：
+示例1：
 题目：Look at those dark clouds! I think it ______ soon.
 A. rains  B. is going to rain  C. has rained  D. rained
 答案：B
-解析：根据"dark clouds"这个现在能看到的证据，用be going to表示预测。
+解析：根据"dark clouds"这个现在能看到的证据，用be going to表示预测。A是一般现在时不表预测，C现在完成时表已发生，D过去时。
+
+示例2：
+题目：My sister ______ in Paris for six months now. She really enjoys living there.
+A. works  B. is working  C. has worked  D. worked
+答案：C
+解析："for six months"+"now"表示从过去持续到现在，用现在完成时。
 
 绝对禁止：❌直接问词义 ❌词汇配对 ❌没有语境
-必须：✅完整语境 ✅考查理解运用 ✅合理迷惑选项 ✅中文解析
+必须：✅完整语境 ✅考查理解运用 ✅合理迷惑选项 ✅中文解析说明"为什么对"和"为什么其他选项不对"
 
 返回纯JSON数组，不要markdown代码块。5道题。
 格式:[{"question":"含____的完整情境题目","options":["A. ...","B. ...","C. ...","D. ..."],"answer":"A","explanation":"中文解析"}]`,
@@ -314,23 +325,39 @@ Part 3题型：基于文章出5道理解题，4选项。考查细节理解、推
 
 出题规则：
 - 第1题关于文章开头或背景
-- 中间3题考具体细节（换个说法，不是原文照搬）
-- 最后1题关于整体主旨
+- 中间3题考具体细节（需要换个说法，不是原文照搬）
+- 最后1题关于整体主旨（如"What is the best title?" 或 "What is the writer's main purpose?"）
 - 干扰选项：包含文中的词但曲解意思；部分正确但不完整；看似合理但未提及
 
+示例（第1题）：
+题目：What does the writer suggest about pop-up shops in the first paragraph?
+A. They were created to help landlords sell their buildings.
+B. They started as a way for small businesses to use empty spaces temporarily.
+C. They were first popular in countries outside the UK.
+D. They became successful because the economy was weak.
+答案：B
+
+示例（最后一题）：
+题目：What is the writer's main purpose in this article?
+A. To persuade readers to open a pop-up shop.
+B. To compare pop-up shops with traditional shops.
+C. To explain what pop-up shops are and why they are popular.
+D. To warn about the risks of starting a pop-up business.
+答案：C
+
 绝对禁止：❌直接问词义 ❌词汇配对 ❌没有语境
-必须：✅完整语境 ✅考查理解运用 ✅合理迷惑选项 ✅中文解析
+必须：✅完整语境 ✅考查理解运用 ✅合理迷惑选项 ✅中文解析说明"为什么对"和"为什么其他选项不对"
 
 返回纯JSON数组，不要markdown代码块。5道题。
 格式:[{"question":"题目","options":["A. ...","B. ...","C. ...","D. ..."],"answer":"A","explanation":"中文解析"}]`,
-      user: (title, text) => `根据以下文章内容出5道PET Reading Part 3风格阅读理解题：\n文章主题：${title}\n文章词汇：${text}`,
+      user: (title, text) => `根据以下文章内容出5道PET Reading Part 3风格阅读理解题：\n文章主题：${title}\n\n文章内容：\n${text}`,
     },
     listening: {
       system: `你是PET考试出题专家。请出实用英语情境选择题。
 
 每道题描述一个具体的生活场景，让学生选择最恰当的表达。4个选项都是合理的英语句子，但只有1个最适合当前情境。
 
-示例：
+示例1：
 题目：You are at a market and you think the price of a jacket is too high. You want the seller to lower the price. What would you say?
 A. "I'll take it for that price, thanks."
 B. "Could you knock a bit off? That's quite expensive."
@@ -339,8 +366,17 @@ D. "That's a real bargain, I'll buy two!"
 答案：B
 解析：B用了砍价常用表达"knock off"，语气礼貌。A是接受价格，C说没钱不是砍价，D说便宜要买两个跟题意矛盾。
 
+示例2：
+题目：A seller offers you a discount: "I can do it for £50 instead of £80." You think this is fair. What would you say?
+A. "That's silly, I'm not paying that."
+B. "I haven't got that kind of money."
+C. "You can't say fairer than that. It's a deal!"
+D. "Can you knock off another £20?"
+答案：C
+解析：C表示接受这个合理的价格。"You can't say fairer than that"是地道表达，意思是"不能比这更公道了"。
+
 绝对禁止：❌直接问词义 ❌词汇配对 ❌没有语境
-必须：✅完整语境 ✅考查理解运用 ✅合理迷惑选项 ✅中文解析
+必须：✅完整语境 ✅考查理解运用 ✅合理迷惑选项 ✅中文解析说明"为什么对"和"为什么其他选项不对"
 
 返回纯JSON数组，不要markdown代码块。5道题。
 格式:[{"question":"完整情境描述","options":["A. ...","B. ...","C. ...","D. ..."],"answer":"A","explanation":"中文解析"}]`,
@@ -393,8 +429,9 @@ D. "That's a real bargain, I'll buy two!"
       const type = session.type || 'vocabulary';
       const promptConfig = EXERCISE_PROMPTS[type] || EXERCISE_PROMPTS.vocabulary;
 
-      const contentText = htmlToText(session.content || '').slice(0, 1500);
-      const transcriptText = htmlToText(session.transcript || '').slice(0, 1500);
+      const maxLen = session.type === 'reading' ? 3000 : 1500;
+      const contentText = htmlToText(session.content || '').slice(0, maxLen);
+      const transcriptText = htmlToText(session.transcript || '').slice(0, maxLen);
       const keywordsText = (session.keyWords || []).slice(0, 20).join(', ');
       const vocabText = contentText || transcriptText || keywordsText;
 
