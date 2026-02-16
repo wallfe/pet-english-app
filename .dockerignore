@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+ENV/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# Database (will be downloaded from HF Dataset)
+*.db
+data/
+
+# Logs
+logs/
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Build output (will be rebuilt in Docker)
+frontend/dist/
+
+# Misc
+.cache/
+temp/
+tmp/
