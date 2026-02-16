@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PET English Study Tool</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-logo">📖</span>
+        <span class="sidebar-title">PET Study</span>
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="sidebar-body">
+        <label class="sidebar-label">选择单元</label>
+        <select class="unit-select" id="unitSelect"></select>
+
+        <label class="sidebar-label">功能</label>
+        <div class="mode-buttons">
+          <button class="mode-btn active" data-mode="learn">
+            <span class="mode-icon">📖</span><span class="mode-text">学习</span>
+          </button>
+          <button class="mode-btn" data-mode="review">
+            <span class="mode-icon">🔄</span><span class="mode-text">复习单词</span>
+            <span class="badge" id="reviewBadge" hidden>0</span>
+          </button>
+          <button class="mode-btn" data-mode="errors">
+            <span class="mode-icon">✏️</span><span class="mode-text">错题本</span>
+            <span class="badge" id="errorBadge" hidden>0</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <header class="topbar">
+        <h1 class="topbar-title" id="topbarTitle">BBC Learning English · Intermediate</h1>
+      </header>
+
+      <!-- Learn Mode -->
+      <div class="mode-panel" id="panelLearn">
+        <div class="session-tabs" id="sessionTabs"></div>
+        <div class="content-area" id="contentArea">
+          <div class="empty-state">
+            <div class="empty-icon">📚</div>
+            <p>选择一个 Session 开始学习</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Review Mode -->
+      <div class="mode-panel hidden" id="panelReview">
+        <div class="review-header">
+          <h2>单词复习</h2>
+          <div class="review-controls">
+            <button class="btn" id="btnReviewAll">复习全部</button>
+            <button class="btn btn-outline" id="btnReviewUnit">当前单元</button>
+          </div>
+        </div>
+        <div class="flashcard-area" id="flashcardArea">
+          <div class="empty-state">
+            <div class="empty-icon">🔄</div>
+            <p>点击上方按钮开始复习</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Mode -->
+      <div class="mode-panel hidden" id="panelErrors">
+        <div class="review-header">
+          <h2>错题本</h2>
+          <button class="btn btn-outline" id="btnClearErrors">清空</button>
+        </div>
+        <div id="errorList" class="error-list">
+          <div class="empty-state">
+            <div class="empty-icon">✅</div>
+            <p>暂无错题记录</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Flashcard Modal -->
+  <div class="modal-overlay hidden" id="flashcardModal">
+    <div class="modal flashcard-modal">
+      <div class="flashcard-progress">
+        <span id="flashcardCount">0/0</span>
+        <button class="modal-close" id="flashcardClose">&times;</button>
+      </div>
+      <div class="flashcard" id="flashcard">
+        <div class="flashcard-front" id="flashcardFront"></div>
+        <div class="flashcard-back hidden" id="flashcardBack"></div>
+      </div>
+      <div class="flashcard-actions">
+        <button class="btn btn-danger" id="btnWrong">不认识 ✗</button>
+        <button class="btn" id="btnFlip">翻转</button>
+        <button class="btn btn-success" id="btnRight">认识 ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
