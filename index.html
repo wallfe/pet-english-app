@@ -44,7 +44,7 @@
 
         <label class="sidebar-label" style="margin-top:20px">设置</label>
         <input class="api-key-input" id="apiKeyInput" type="password" placeholder="DeepSeek API Key" />
-        <div class="api-key-hint">用于作文批改和单词解释</div>
+        <div class="api-key-hint">用于练习题、词汇网络、作文批改</div>
       </div>
     </aside>
 
@@ -62,6 +62,41 @@
             <div class="empty-icon">📚</div>
             <p>选择一个 Session 开始学习</p>
           </div>
+        </div>
+
+        <!-- Action Buttons (shown after selecting a session) -->
+        <div class="action-bar hidden" id="actionBar">
+          <button class="action-btn" id="btnExercises">🎯 PET练习题</button>
+          <button class="action-btn" id="btnWordNet">🕸️ 词汇网络</button>
+          <button class="action-btn" id="btnLecture">📚 AI讲解</button>
+        </div>
+
+        <!-- Exercise Area -->
+        <div class="exercise-area hidden" id="exerciseArea">
+          <div class="exercise-header">
+            <h3>PET 练习题</h3>
+            <span class="exercise-score" id="exerciseScore"></span>
+          </div>
+          <div id="exerciseList"></div>
+        </div>
+
+        <!-- Word Network Area -->
+        <div class="wordnet-area hidden" id="wordNetArea">
+          <div class="wordnet-header">
+            <h3>词汇联想网络</h3>
+            <div class="wordnet-input-row">
+              <input type="text" class="wordnet-input" id="wordNetInput" placeholder="输入单词..." />
+              <button class="btn" id="btnWordNetGo">查询</button>
+            </div>
+          </div>
+          <div id="wordNetSvg"></div>
+          <div class="wordnet-example hidden" id="wordNetExample"></div>
+        </div>
+
+        <!-- AI Lecture Area -->
+        <div class="lecture-area hidden" id="lectureArea">
+          <h3>AI 讲解</h3>
+          <div id="lectureContent" class="lecture-content"></div>
         </div>
       </div>
 
@@ -85,13 +120,15 @@
       <!-- Essay Mode -->
       <div class="mode-panel hidden" id="panelEssay">
         <div class="review-header">
-          <h2>写作练习</h2>
-          <button class="btn" id="btnSubmitEssay" disabled>提交批改</button>
+          <h2>写作练习 (PET Writing)</h2>
         </div>
-        <div class="essay-topic" id="essayTopic">
-          <p>选择一个单元后，这里会显示写作话题</p>
+        <div class="essay-topics" id="essayTopics"></div>
+        <div class="essay-selected-topic hidden" id="essaySelectedTopic"></div>
+        <textarea class="essay-input" id="essayInput" placeholder="在这里写你的英文短文...（PET Writing建议100词左右）" rows="10"></textarea>
+        <div class="essay-footer">
+          <span class="word-count" id="wordCount">0 词</span>
+          <button class="btn" id="btnSubmitEssay" disabled>🤖 AI批改</button>
         </div>
-        <textarea class="essay-input" id="essayInput" placeholder="在这里写你的英文作文..." rows="10"></textarea>
         <div class="essay-feedback hidden" id="essayFeedback"></div>
       </div>
 
@@ -99,13 +136,25 @@
       <div class="mode-panel hidden" id="panelErrors">
         <div class="review-header">
           <h2>错题本</h2>
-          <button class="btn btn-outline" id="btnClearErrors">清空</button>
+          <div class="review-controls">
+            <button class="btn" id="btnReviewErrors">🤖 AI生成复习题</button>
+            <button class="btn btn-outline" id="btnClearErrors">清空</button>
+          </div>
         </div>
+        <div class="error-stats" id="errorStats"></div>
         <div id="errorList" class="error-list">
           <div class="empty-state">
             <div class="empty-icon">✅</div>
             <p>暂无错题记录</p>
           </div>
+        </div>
+        <!-- Review exercises generated from errors -->
+        <div class="exercise-area hidden" id="reviewExerciseArea">
+          <div class="exercise-header">
+            <h3>针对性复习题</h3>
+            <span class="exercise-score" id="reviewExerciseScore"></span>
+          </div>
+          <div id="reviewExerciseList"></div>
         </div>
       </div>
     </main>
