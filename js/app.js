@@ -16,6 +16,7 @@
   const STORAGE = {
     ERRORS: 'pet_errors',
     REVIEW: 'pet_review_due',
+    API_KEY: 'pet_gemini_key',
   };
 
   // ---- DOM refs ----
@@ -33,11 +34,49 @@
       return;
     }
 
+    // Restore API key
+    const savedKey = localStorage.getItem(STORAGE.API_KEY) || '';
+    $('apiKeyInput').value = savedKey;
+
     buildUnitSelect();
     bindEvents();
     switchMode('learn');
     selectUnit(1);
     updateBadges();
+  }
+
+  // ---- DeepSeek API ----
+  function getApiKey() {
+    return $('apiKeyInput').value.trim();
+  }
+
+  async function callLLM(prompt) {
+    const key = getApiKey();
+    if (!key) {
+      throw new Error('请先在左侧设置中输入 DeepSeek API Key');
+    }
+
+    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API 错误 (${resp.status})`);
+    }
+
+    const data = await resp.json();
+    return data.choices?.[0]?.message?.content || '无返回内容';
   }
 
   // ---- Unit select ----
@@ -62,6 +101,7 @@
 
     renderSessionTabs();
     $('contentArea').innerHTML = '<div class="empty-state"><div class="empty-icon">📚</div><p>选择一个 Session 开始学习</p></div>';
+    updateEssayTopic();
   }
 
   // ---- Session tabs ----
@@ -81,12 +121,9 @@
 
   function selectSession(id) {
     currentSession = id;
-
-    // Highlight tab
     $$('.session-tab').forEach((t, i) => {
       t.classList.toggle('active', i === id - 1);
     });
-
     renderContent();
   }
 
@@ -121,9 +158,14 @@
     // Keywords
     if (session.keyWords && session.keyWords.length > 0) {
       const tags = session.keyWords
-        .map((kw) => `<span class="keyword-tag" title="点击添加到复习">${esc(kw)}</span>`)
+        .map((kw) => `<span class="keyword-tag" data-word="${esc(kw)}">${esc(kw)}</span>`)
         .join('');
-      html += buildSection(`🏷️ 关键词 (${session.keyWords.length})`, `<div class="keyword-list">${tags}</div>`, null, true);
+      html += buildSection(
+        `🏷️ 关键词 (${session.keyWords.length}) <span style="font-weight:normal;font-size:12px;color:var(--text-secondary)">单击=复习 | 双击=AI解释</span>`,
+        `<div class="keyword-list">${tags}</div>`,
+        null,
+        true
+      );
     }
 
     area.innerHTML = html;
@@ -136,13 +178,23 @@
       });
     });
 
-    // Bind keyword click → add to review
+    // Bind keyword: single click = add to review, double click = AI explain
     area.querySelectorAll('.keyword-tag').forEach((tag) => {
+      let clickTimer = null;
       tag.addEventListener('click', () => {
-        addToReview(tag.textContent, currentUnit, currentSession);
-        tag.style.background = '#16a34a';
-        tag.style.color = '#fff';
-        setTimeout(() => { tag.style.background = ''; tag.style.color = ''; }, 600);
+        if (clickTimer) return; // wait for dblclick check
+        clickTimer = setTimeout(() => {
+          clickTimer = null;
+          addToReview(tag.dataset.word, currentUnit, currentSession);
+          tag.style.background = '#16a34a';
+          tag.style.color = '#fff';
+          setTimeout(() => { tag.style.background = ''; tag.style.color = ''; }, 600);
+        }, 250);
+      });
+      tag.addEventListener('dblclick', () => {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+        explainWord(tag.dataset.word);
       });
     });
   }
@@ -167,14 +219,130 @@
   // ---- Mode switching ----
   function switchMode(mode) {
     currentMode = mode;
-
     $$('.mode-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
 
     $('panelLearn').classList.toggle('hidden', mode !== 'learn');
     $('panelReview').classList.toggle('hidden', mode !== 'review');
     $('panelErrors').classList.toggle('hidden', mode !== 'errors');
+    $('panelEssay').classList.toggle('hidden', mode !== 'essay');
 
     if (mode === 'errors') renderErrors();
+    if (mode === 'essay') updateEssayTopic();
+  }
+
+  // ---- Word explanation (AI) ----
+  async function explainWord(word) {
+    const popup = $('wordPopup');
+    const body = $('wordPopupBody');
+    $('wordPopupTitle').textContent = word;
+    body.innerHTML = '<div class="loading-dots">AI 解释中</div>';
+    popup.classList.remove('hidden');
+
+    try {
+      const unit = units[currentUnit];
+      const prompt = `You are an English teacher helping a Chinese intermediate learner.
+Explain the word/phrase "${word}" in the context of BBC Learning English, topic "${unit.title}".
+
+Reply in this format (mix English and Chinese):
+1. **Meaning**: English definition + 中文释义
+2. **Example**: 2 example sentences
+3. **Note**: Any common mistakes or usage tips
+
+Keep it concise (under 150 words).`;
+
+      const result = await callLLM(prompt);
+      body.innerHTML = formatMarkdown(result);
+    } catch (e) {
+      body.innerHTML = `<p style="color:var(--danger)">${esc(e.message)}</p>`;
+    }
+  }
+
+  // ---- Essay writing (AI) ----
+  function updateEssayTopic() {
+    const unit = units[currentUnit];
+    if (!unit) return;
+
+    // Gather keywords from all sessions for topic inspiration
+    const allKeywords = unit.sessions.flatMap((s) => (s.keyWords || []).slice(0, 5));
+    const sampleWords = allKeywords.slice(0, 10).join(', ');
+
+    $('essayTopic').innerHTML = `
+      <strong>写作话题：${unit.title}</strong><br>
+      请用英文写一篇短文（100-200词），可以参考以下关键词：<br>
+      <em>${sampleWords}</em>
+    `;
+
+    $('essayInput').value = '';
+    $('essayFeedback').classList.add('hidden');
+    $('btnSubmitEssay').disabled = false;
+  }
+
+  async function submitEssay() {
+    const text = $('essayInput').value.trim();
+    if (!text) return;
+    if (text.split(/\s+/).length < 20) {
+      alert('请至少写20个单词');
+      return;
+    }
+
+    const btn = $('btnSubmitEssay');
+    btn.disabled = true;
+    btn.textContent = '批改中...';
+
+    const feedback = $('essayFeedback');
+    feedback.classList.remove('hidden');
+    feedback.innerHTML = '<div class="loading-dots">AI 批改中</div>';
+
+    try {
+      const unit = units[currentUnit];
+      const prompt = `You are an English teacher grading an intermediate student's essay.
+Topic: "${unit.title}" (BBC Learning English Intermediate Course)
+
+Student's essay:
+"""
+${text}
+"""
+
+Please provide feedback in this format (use Chinese for explanations, English for examples):
+
+**Score: X/10**
+
+**语法错误 (Grammar)**:
+- List specific errors with corrections
+
+**词汇建议 (Vocabulary)**:
+- Suggest better word choices
+
+**内容与结构 (Content & Structure)**:
+- Comment on organization and ideas
+
+**改进版本 (Improved version)**:
+- Rewrite 1-2 key sentences showing improvement
+
+Keep feedback actionable and encouraging. Under 300 words.`;
+
+      const result = await callLLM(prompt);
+      feedback.innerHTML = formatMarkdown(result);
+    } catch (e) {
+      feedback.innerHTML = `<p style="color:var(--danger)">${esc(e.message)}</p>`;
+    }
+
+    btn.textContent = '重新批改';
+    btn.disabled = false;
+  }
+
+  // ---- Simple markdown → HTML ----
+  function formatMarkdown(text) {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`(.*?)`/g, '<code>$1</code>')
+      .replace(/^- (.*)/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>')
+      .replace(/^/, '<p>')
+      .replace(/$/, '</p>');
   }
 
   // ---- Review / Flashcard system ----
@@ -199,7 +367,6 @@
       list = list.filter((r) => String(r.unitId) === String(currentUnit));
     }
     if (list.length === 0) {
-      // If no saved words, use current unit keywords
       const unit = units[currentUnit];
       list = [];
       unit.sessions.forEach((s) => {
@@ -293,7 +460,6 @@
       return;
     }
 
-    // Sort by count desc
     list.sort((a, b) => b.count - a.count);
 
     el.innerHTML = list
@@ -342,6 +508,11 @@
       btn.addEventListener('click', () => switchMode(btn.dataset.mode));
     });
 
+    // API key save
+    $('apiKeyInput').addEventListener('change', (e) => {
+      localStorage.setItem(STORAGE.API_KEY, e.target.value.trim());
+    });
+
     // Review buttons
     $('btnReviewAll').addEventListener('click', () => startReview('all'));
     $('btnReviewUnit').addEventListener('click', () => startReview('unit'));
@@ -364,13 +535,27 @@
       }
     });
 
+    // Essay
+    $('btnSubmitEssay').addEventListener('click', submitEssay);
+    $('essayInput').addEventListener('input', () => {
+      $('btnSubmitEssay').disabled = $('essayInput').value.trim().length < 10;
+    });
+
+    // Word popup close
+    $('wordPopupClose').addEventListener('click', () => {
+      $('wordPopup').classList.add('hidden');
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        $('wordPopup').classList.add('hidden');
+        if (!$('flashcardModal').classList.contains('hidden')) closeFlashcard();
+      }
       if ($('flashcardModal').classList.contains('hidden')) return;
       if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flipCard(); }
       if (e.key === 'ArrowRight' || e.key === 'j') answerCard(true);
       if (e.key === 'ArrowLeft' || e.key === 'k') answerCard(false);
-      if (e.key === 'Escape') closeFlashcard();
     });
   }
 

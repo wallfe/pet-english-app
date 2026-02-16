@@ -37,7 +37,14 @@
             <span class="mode-icon">✏️</span><span class="mode-text">错题本</span>
             <span class="badge" id="errorBadge" hidden>0</span>
           </button>
+          <button class="mode-btn" data-mode="essay">
+            <span class="mode-icon">📝</span><span class="mode-text">写作练习</span>
+          </button>
         </div>
+
+        <label class="sidebar-label" style="margin-top:20px">设置</label>
+        <input class="api-key-input" id="apiKeyInput" type="password" placeholder="DeepSeek API Key" />
+        <div class="api-key-hint">用于作文批改和单词解释</div>
       </div>
     </aside>
 
@@ -75,6 +82,19 @@
         </div>
       </div>
 
+      <!-- Essay Mode -->
+      <div class="mode-panel hidden" id="panelEssay">
+        <div class="review-header">
+          <h2>写作练习</h2>
+          <button class="btn" id="btnSubmitEssay" disabled>提交批改</button>
+        </div>
+        <div class="essay-topic" id="essayTopic">
+          <p>选择一个单元后，这里会显示写作话题</p>
+        </div>
+        <textarea class="essay-input" id="essayInput" placeholder="在这里写你的英文作文..." rows="10"></textarea>
+        <div class="essay-feedback hidden" id="essayFeedback"></div>
+      </div>
+
       <!-- Error Mode -->
       <div class="mode-panel hidden" id="panelErrors">
         <div class="review-header">
@@ -107,6 +127,17 @@
         <button class="btn" id="btnFlip">翻转</button>
         <button class="btn btn-success" id="btnRight">认识 ✓</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Word Explanation Popup -->
+  <div class="word-popup hidden" id="wordPopup">
+    <div class="word-popup-header">
+      <span class="word-popup-title" id="wordPopupTitle"></span>
+      <button class="modal-close" id="wordPopupClose">&times;</button>
+    </div>
+    <div class="word-popup-body" id="wordPopupBody">
+      <div class="loading-dots">AI 解释中...</div>
     </div>
   </div>
 
