@@ -263,18 +263,8 @@ body {
   margin-bottom: 16px;
 }
 .audio-player audio { flex: 1; height: 36px; }
+.audio-player iframe { flex: 1; }
 .audio-label { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
-.bbc-audio-link {
-  color: var(--accent);
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 6px 14px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
-  transition: all var(--transition);
-}
-.bbc-audio-link:hover { background: var(--accent); color: #fff; }
 
 /* ---- Action Bar ---- */
 .action-bar {

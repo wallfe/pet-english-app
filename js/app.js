@@ -204,19 +204,18 @@
     const area = $('contentArea');
     let html = '';
 
-    // Audio player or BBC link fallback
+    // Audio player: direct MP3 or BBC embed player
     if (session.audioUrl) {
       html += `
         <div class="audio-player">
           <span class="audio-label">🔊 音频</span>
           <audio controls preload="none" src="${session.audioUrl}"></audio>
         </div>`;
-    } else if (session.type === 'listening') {
-      const bbcUrl = `https://www.bbc.co.uk/learningenglish/english/course/intermediate/unit-${currentUnit}/session-${currentSession}`;
+    } else if (session.audioPid) {
       html += `
         <div class="audio-player">
           <span class="audio-label">🔊 音频</span>
-          <a href="${bbcUrl}" target="_blank" rel="noopener" class="bbc-audio-link">在 BBC 页面收听 ↗</a>
+          <iframe src="https://www.bbc.co.uk/programmes/${session.audioPid}/player" width="100%" height="80" style="border:none;border-radius:8px;" allow="autoplay" loading="lazy"></iframe>
         </div>`;
     }
 
