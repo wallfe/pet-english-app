@@ -38,8 +38,10 @@
       return;
     }
 
-    const savedKey = localStorage.getItem(STORAGE.API_KEY) || '';
+    const DEFAULT_KEY = 'sk-8105a3dbce7947ee89d53b819777cabe';
+    const savedKey = localStorage.getItem(STORAGE.API_KEY) || DEFAULT_KEY;
     $('apiKeyInput').value = savedKey;
+    localStorage.setItem(STORAGE.API_KEY, savedKey);
 
     buildUnitSelect();
     bindEvents();
