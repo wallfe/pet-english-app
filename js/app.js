@@ -1103,28 +1103,67 @@ D. "Can you knock off another £20?"
     btn.textContent = '🤖 AI生成复习题';
   }
 
-  // ---- Markdown → HTML (enhanced) ----
+  // ---- Markdown → HTML (line-based parser) ----
   function formatMarkdown(text) {
-    return text
-      .replace(/## (.*)/g, '<h3>$1</h3>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`(.*?)`/g, '<code>$1</code>')
-      .replace(/^- (.*)/gm, '<li>$1</li>')
-      .replace(/(<li>[\s\S]*?<\/li>)/g, function (match) {
-        if (!match.startsWith('<ul>')) return '<ul>' + match + '</ul>';
-        return match;
-      })
-      .replace(/<\/ul>\s*<ul>/g, '')
-      .replace(/→/g, '→')
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br>')
-      .replace(/^/, '<p>')
-      .replace(/$/, '</p>')
-      .replace(/<p><h3>/g, '<h3>')
-      .replace(/<\/h3><\/p>/g, '</h3>')
-      .replace(/<p><ul>/g, '<ul>')
-      .replace(/<\/ul><\/p>/g, '</ul>');
+    const lines = text.split('\n');
+    let html = '';
+    let inUl = false, inOl = false, inP = false;
+
+    function closeList() {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (inOl) { html += '</ol>'; inOl = false; }
+    }
+    function closeP() {
+      if (inP) { html += '</p>'; inP = false; }
+    }
+    function inlineFormat(s) {
+      return s
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>');
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // Empty line → close open blocks
+      if (!trimmed) { closeList(); closeP(); continue; }
+
+      // Headings
+      const hMatch = trimmed.match(/^(#{1,4})\s+(.*)/);
+      if (hMatch) {
+        closeList(); closeP();
+        const lvl = Math.min(hMatch[1].length + 1, 6); // # → h2, ## → h3, etc.
+        html += `<h${lvl}>${inlineFormat(hMatch[2])}</h${lvl}>`;
+        continue;
+      }
+
+      // Unordered list
+      if (/^[-*]\s+/.test(trimmed)) {
+        closeP();
+        if (!inUl) { closeList(); html += '<ul>'; inUl = true; }
+        html += `<li>${inlineFormat(trimmed.replace(/^[-*]\s+/, ''))}</li>`;
+        continue;
+      }
+
+      // Ordered list
+      if (/^\d+[.)]\s+/.test(trimmed)) {
+        closeP();
+        if (!inOl) { closeList(); html += '<ol>'; inOl = true; }
+        html += `<li>${inlineFormat(trimmed.replace(/^\d+[.)]\s+/, ''))}</li>`;
+        continue;
+      }
+
+      // Normal paragraph text
+      closeList();
+      if (!inP) { html += '<p>'; inP = true; }
+      else { html += '<br>'; }
+      html += inlineFormat(trimmed);
+    }
+    closeList(); closeP();
+    return html;
+  }
   }
 
   // ---- Review / Flashcard system ----
