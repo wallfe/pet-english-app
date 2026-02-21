@@ -1164,7 +1164,6 @@ D. "Can you knock off another £20?"
     closeList(); closeP();
     return html;
   }
-  }
 
   // ---- Review / Flashcard system ----
   function getReviewList() {
